@@ -41,6 +41,11 @@ namespace Proxemity.UnitTests.Samples {
     public int Foo(string a, object b, int c) {
       return (int)Target2.MethodCalled("Foo", new object[] { a, b, StaticField, StaticProp });
     }
+
+    //factory method
+    public static SampleHandCodedProxy Create(string x) {
+      return new SampleHandCodedProxy(x); 
+    }
   } // sample proxy class
 
 

@@ -60,6 +60,31 @@ namespace Proxemity {
       return list;
     }
 
+    internal static bool IsStatic(this MemberInfo member) {
+      switch(member) {
+        case PropertyInfo prop:
+          return prop.GetMethod.IsStatic;
+        case FieldInfo field:
+          return field.IsStatic;
+        case MethodInfo method:
+          return method.IsStatic;
+        default:
+          return false;
+      }
+    }
+
+    internal static object GetFactory(Type proxyType, Type funcType) {
+      var genParams = funcType.GetGenericArguments();
+      var returnType = genParams[genParams.Length - 1];
+      Check(returnType.IsAssignableFrom(proxyType), "Invalid Func return type {0}; must be compatible with proxy base type {1}).", returnType, proxyType.BaseType);
+      var paramTypes = genParams.Take(genParams.Length - 1).ToArray();
+      // var flags = BindingFlags.Static | BindingFlags.Public;
+      var method = proxyType.GetMethod(ProxyEmitter.FactoryMethodName, paramTypes);
+      Check(method != null, "Factory method with provided parameter types not found.");
+      var func = method.CreateDelegate(funcType);
+      return func;
+
+    }
 
   } //class
 

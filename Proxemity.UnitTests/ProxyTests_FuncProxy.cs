@@ -22,12 +22,14 @@ namespace Proxemity.UnitTests {
       var controller = new FuncProxyEmitController();
       emitter.ImplementInterface(typeof(ISampleFuncInterface), controller);
       // create type
-      var proxyType = emitter.CreateTypeInfo().AsType();
+      var proxyType = emitter.Complete();
 
       // create and setup target object; FuncProxyBase has a single constructor which accepts single parameter (Target)
       //  emitter will build similar constructor on the generated proxy
       var target = new FuncProxyTarget();
-      var proxy =  Activator.CreateInstance(proxyType, target);
+      var factory = proxyInfo.GetProxyFactory<Func<FuncProxyTarget, FuncProxyBase>>();
+
+      var proxy = factory(target); 
       // cast the entity instance to entity interface and test it
       var iFunc = proxy as ISampleFuncInterface;
       Assert.IsNotNull(iFunc, "Failed to retrieve IFunc interface.");
@@ -39,7 +41,7 @@ namespace Proxemity.UnitTests {
       Assert.AreEqual("IntMethod", target.LastMethod, "Method name mismatch");
       Assert.AreEqual(d, target.LastArgs[0]);
       Assert.AreEqual(obj, target.LastArgs[1]);
-      Assert.AreEqual(proxy, target.ExtraValues[0]); //should be reference to proxy instance itself - see FuncProxyBuilderMethodSelector
+      Assert.AreEqual(proxy, target.ExtraValues[0]); //should be reference to proxy instance itself - see FuncProxyEmitController
       Assert.AreEqual(Singleton.InstanceField, target.ExtraValues[1]);
       Assert.AreEqual(Singleton.InstanceProp, target.ExtraValues[2]);
 
@@ -53,14 +55,14 @@ namespace Proxemity.UnitTests {
       Assert.AreEqual("x", (string)target.LastArgs[0]);
 
       // We specified a custom attribute on class in ProxyInfo (see above) when we initialized emitter
-      var classAttr = proxy.GetType().GetCustomAttributes(false).OfType<SampleCustomAttribute>().FirstOrDefault();
+      var classAttr = proxyType.GetCustomAttributes(false).OfType<SampleCustomAttribute>().FirstOrDefault();
       Assert.IsNotNull(classAttr, "Custom attr not found on proxy class.");
       Assert.AreEqual("c1", classAttr.Value1, "Value1 on attr does not match.");
       Assert.AreEqual("c2", classAttr.Value2, "Value2 on attr does not match.");
 
 
       //Emit controller creates custom attributes on methods; verify these
-      var meth = proxy.GetType().GetMember("IntMethod")[0];
+      var meth = proxyType.GetMember("IntMethod")[0];
       var methAttr = meth.GetCustomAttributes(false).OfType<SampleCustomAttribute>().FirstOrDefault();
       Assert.IsNotNull(methAttr, "Custom attr not found on method.");
       Assert.AreEqual("v1", methAttr.Value1, "Value1 on attr does not match.");

@@ -11,11 +11,14 @@ namespace Proxemity {
 
   /// <summary>IL Proxy emitter. Emits dynamic class implementing one or more interfaces. </summary>
   public class ProxyEmitter {
+    public const string FactoryMethodName = "Create_";
+
     ProxyClassInfo _proxyClassInfo; 
     TypeBuilder _typeBuilder;
-    bool _typeCreated;
     IList<MethodBuilder> _builtMethods;
 
+    /// <summary>Creates an instance of the ProxyEmitter class. </summary>
+    /// <param name="proxyClassInfo">The information about the proxy class to emit.</param>
     public ProxyEmitter(ProxyClassInfo proxyClassInfo) {
       Util.CheckParam(proxyClassInfo, nameof(proxyClassInfo));
       _proxyClassInfo = proxyClassInfo;
@@ -29,18 +32,12 @@ namespace Proxemity {
           _typeBuilder.SetCustomAttribute(CreateAttributeBuilder(attrExpr));
     } //constr
 
-
-    public static DynamicAssemblyInfo CreateDynamicAssembly(string assemblyName, Version version = null) {
-      var asmName = new AssemblyName(assemblyName);
-      asmName.Version = version ?? new Version(1, 0, 0, 0);
-      var asmBuilder = AssemblyBuilder.DefineDynamicAssembly(asmName, AssemblyBuilderAccess.Run);
-      var moduleBuilder = asmBuilder.DefineDynamicModule("Main");
-      return new DynamicAssemblyInfo(asmBuilder, moduleBuilder); 
-    }
-
-
+    /// <summary>Implements interface on a proxy class - emits members of the interface.</summary>
+    /// <param name="interfaceType">Interface type.</param>
+    /// <param name="controller">Emit controller - an object that will provide details about emitting 
+    /// interface members, one at a time.</param>
     public void ImplementInterface(Type interfaceType, IProxyEmitController controller) {
-      Util.Check(!_typeCreated, "The proxy class had been finalized and created, cannot add interface.");
+      Util.Check(!IsCompleted(), "The proxy class had been finalized and created, cannot add interface.");
       Util.CheckParam(interfaceType, nameof(interfaceType));
       Util.CheckParam(controller, nameof(controller));
       Util.Check(interfaceType.IsInterface, "Invalid interfaceType argument - expected interface type, provided: {0}.", interfaceType);
@@ -64,18 +61,31 @@ namespace Proxemity {
       }
     }//method
 
-    /// <summary>Returns current type builder. You can use it to customize the emitted type before it is finalized and created by CreateTypeInfo(). </summary>
-    /// <returns></returns>
+    /// <summary>Returns current type builder. You can use it to customize the emitted type before it is finalized and created by <see cref="Complete"/> method. </summary>
+    /// <returns>Type builder instance.</returns>
     public TypeBuilder GetTypeBuilder() {
+      Util.Check(!IsCompleted(), "The proxy class had been finalized and created, type builder is not available.");
       return _typeBuilder; 
     }
 
-    public TypeInfo CreateTypeInfo() {
-      _typeCreated = true; 
+    /// <summary>Returns true if emit process is completed and the type is created.</summary>
+    public bool IsCompleted() {
+      return _proxyClassInfo.ProxyClass != null; 
+    }
+    /// <summary>Finalizes the emit process and creates a TypeInfo representing the emitted proxy class. </summary>
+    /// <returns>Type representing the emitted class.</returns>
+    /// <remarks>No more emit actions can be performed (ImplementInterface calls) after this method is called.
+    /// The proxy Type instance is also saved in the <see cref="ProxyClassInfo.ProxyClass"/> property of the class info.
+    /// </remarks>
+    public Type Complete() {
+      Util.Check(!IsCompleted(), "The emit process is already completed.");
       var typeInfo = _typeBuilder.CreateTypeInfo();
-      return typeInfo;
+      _proxyClassInfo.ProxyClass = typeInfo.AsType();
+      _typeBuilder = null; 
+      return _proxyClassInfo.ProxyClass;
     }
 
+    
     private ConstructorBuilder BuildConstructor(ConstructorInfo constructor) {
       var attrs = MethodAttributes.HideBySig | MethodAttributes.RTSpecialName | MethodAttributes.SpecialName;
       if (constructor.IsPublic)
@@ -88,14 +98,28 @@ namespace Proxemity {
         ilGen.Emit(OpCodes.Ldarg, i);
       ilGen.Emit(OpCodes.Call, constructor);
       ilGen.Emit(OpCodes.Ret);
+      BuildProxyFactory(cb, paramTypes); 
       return cb; 
+    }
+
+    private void BuildProxyFactory(ConstructorBuilder constr, Type[] paramTypes) {
+      var attrs = MethodAttributes.HideBySig | MethodAttributes.RTSpecialName | MethodAttributes.SpecialName | MethodAttributes.Static | MethodAttributes.Public;
+      var meth = _typeBuilder.DefineMethod(FactoryMethodName, attrs, _typeBuilder, paramTypes);
+      var ilGen = meth.GetILGenerator(); 
+      // load args
+      for(int i = 0; i < paramTypes.Length; i++) {
+        ilGen.Emit(OpCodes.Ldarg, i);
+      }
+      // call
+      ilGen.Emit(OpCodes.Newobj, constr);
+      ilGen.Emit(OpCodes.Ret);
     }
 
     private PropertyBuilder BuildProperty(IProxyEmitController controller, PropertyInfo iprop) {
       var interfaceType = iprop.DeclaringType; 
       var pb = _typeBuilder.DefineProperty(iprop.Name, PropertyAttributes.None, iprop.PropertyType, Type.EmptyTypes);
       var intfPropInfo = new InterfaceMemberInfo() { Member = iprop };
-      var targetInfo = controller.GetEmitInfo(intfPropInfo);
+      var emitInfo = controller.GetEmitInfo(intfPropInfo);
 
       if(iprop.GetMethod != null) {
         var getter = BuildMethod(controller, iprop.GetMethod, iprop);
@@ -110,21 +134,21 @@ namespace Proxemity {
         _typeBuilder.DefineMethodOverride(setter, isetter);
       }
       //Attributes
-      foreach(var attrExpr in targetInfo.CustomAttributes)
+      foreach(var attrExpr in emitInfo.CustomAttributes)
         pb.SetCustomAttribute(CreateAttributeBuilder(attrExpr));
       // ReviewCallback
       // Note: do not try to change to shortcut targetPropInfo?.ReviewCallback, for some reason it blows up
-      if(targetInfo.ReviewCallback != null)
-        targetInfo.ReviewCallback(pb); 
+      if(emitInfo.ReviewCallback != null)
+        emitInfo.ReviewCallback(pb); 
       return pb;
     } //method
 
-    private MethodBuilder BuildMethod(IProxyEmitController controller, MethodInfo iMethod, PropertyInfo iProp = null) {
+    private MethodBuilder BuildMethod(IProxyEmitController controller, MethodInfo iMethod, PropertyInfo ownerProperty = null) {
       // Invoke controller to get emit info with target method
-      var intfMethodInfo = new InterfaceMemberInfo() { Member = iMethod, OwnerProperty = iProp };
-      var targetInfo = controller.GetEmitInfo(intfMethodInfo);
+      var intfMethodInfo = new InterfaceMemberInfo() { Member = iMethod, OwnerProperty = ownerProperty };
+      var emitInfo = controller.GetEmitInfo(intfMethodInfo);
       //validate some basic things
-      ValidateTargetInfo(targetInfo, iMethod.Name); 
+      ValidateTargetInfo(emitInfo, iMethod.Name); 
 
       // start building method
       var iParams = iMethod.GetParameters().ToList();
@@ -132,38 +156,38 @@ namespace Proxemity {
       var attrs = MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.Public;
       var mb = _typeBuilder.DefineMethod(iMethod.Name, attrs, iMethod.ReturnType, prmTypes);
       _builtMethods.Add(mb);
-      if(iProp == null)
+      if(ownerProperty == null)
         _typeBuilder.DefineMethodOverride(mb, iMethod);
 
       var ilGen = mb.GetILGenerator();
-      PushTargetRef(ilGen, targetInfo);
+      PushTargetRef(ilGen, emitInfo);
       // we now have target obj on top of the stack
       // load arguments of target method
-      var targetParams = targetInfo.TargetMethod.GetParameters();
-      for(int i = 0; i < targetInfo.Arguments.Length; i++) {
-        var targetArg = targetInfo.Arguments[i];
+      var targetParams = emitInfo.TargetMethod.GetParameters();
+      for(int i = 0; i < emitInfo.Arguments.Length; i++) {
+        var targetArg = emitInfo.Arguments[i];
         var targetPrm = targetParams[i];
         PushArgument(ilGen, iMethod, targetArg, targetPrm.ParameterType);
       }
       // invoke target method
-      ilGen.Emit(OpCodes.Callvirt, (MethodInfo)targetInfo.TargetMethod);
+      ilGen.Emit(OpCodes.Callvirt, (MethodInfo)emitInfo.TargetMethod);
       // process return value
-      ConvertValueIfNeeded(ilGen, targetInfo.TargetMethod.ReturnType, iMethod.ReturnType, iMethod);
+      ConvertValueIfNeeded(ilGen, emitInfo.TargetMethod.ReturnType, iMethod.ReturnType, iMethod);
       //return
       ilGen.Emit(OpCodes.Ret);
       //custom attributes
-      foreach(var attrExpr in targetInfo.CustomAttributes)
+      foreach(var attrExpr in emitInfo.CustomAttributes)
         mb.SetCustomAttribute(CreateAttributeBuilder(attrExpr));
       //Invoke review callback if provided
-      // Note: do not try to change to shortcut targetInfo?.ReviewCallback, for some reason it blows up
-      if(targetInfo.ReviewCallback != null)
-        targetInfo.ReviewCallback(mb); 
+      // Note: do not try to change to shortcut emitInfo?.ReviewCallback, for some reason it blows up
+      if(emitInfo.ReviewCallback != null)
+        emitInfo.ReviewCallback(mb); 
       return mb;
     }
 
-    private void PushTargetRef(ILGenerator ilGen, EmitInfo targetInfo) {
+    private void PushTargetRef(ILGenerator ilGen, EmitInfo emitInfo) {
       // push ref to target from field/prop
-      var targetRef = targetInfo.TargetRef; 
+      var targetRef = emitInfo.TargetRef; 
       switch(targetRef) {
         case FieldInfo fld:
           ilGen.Emit(OpCodes.Ldarg_0); //load ref to this object
@@ -193,6 +217,8 @@ namespace Proxemity {
         var iprm = (ParameterInfo)arg;
         var iParams = iMethod.GetParameters().ToList();
         var iPrmIndex = iParams.IndexOf(iprm);
+        Util.Check(iPrmIndex != -1, "Invalid parameter object reference ({0}) in arguments of method {1}. Must be an input parameter of the interface method. ",
+           iprm.Name, iMethod.Name);
         ilGen.Emit(OpCodes.Ldarg, iPrmIndex + 1); //plus 1 to account for 'this' which is always #0
         ConvertValueIfNeeded(ilGen, iprm.ParameterType, expectedType, iMethod);
         return;
@@ -209,7 +235,8 @@ namespace Proxemity {
         PushPrimitiveValueArg(ilGen, arg, expectedType, iMethod);
         return; 
       }
-      Util.Check(isPrimitive, "Method {0}: Invalid argument value {1} (type {2}). Must be string or primitive value type.", iMethod.Name, arg, arg.GetType().Name);
+      Util.Check(isPrimitive, "Method {0}: Invalid argument value {1} (type {2}). Must be string or primitive value type.", 
+        iMethod.Name, arg, arg.GetType().Name);
     }
 
     private void PushArgBoxArgument(ILGenerator ilGen, MethodInfo iMethod, object targetArg, Type expectedType) {
@@ -302,15 +329,15 @@ namespace Proxemity {
       return attrBuilder; 
     }
 
-    private void ValidateTargetInfo(EmitInfo targetInfo, string iMethodName) {
-      var targetRef = targetInfo.TargetRef;
+    private void ValidateTargetInfo(EmitInfo emitInfo, string iMethodName) {
+      var targetRef = emitInfo.TargetRef;
       Util.Check(targetRef != null, "TargetMethodInfo.TargetRef may not be null; method name: {0}", iMethodName);
       Util.Check(targetRef.MemberType == MemberTypes.Field || targetRef.MemberType == MemberTypes.Property,
         "Invalid target ref type: {0}, expected field or property.", targetRef.MemberType);
-      var targetParams = targetInfo.TargetMethod.GetParameters().ToList();
-      Util.Check(targetParams.Count == targetInfo.Arguments.Length,
+      var targetParams = emitInfo.TargetMethod.GetParameters().ToList();
+      Util.Check(targetParams.Count == emitInfo.Arguments.Length,
             "Invalid TargetInfo for method {0}, arg count {1} does not match target method parameter count {2}",
-                   iMethodName, targetInfo.Arguments.Length, targetParams.Count);
+                   iMethodName, emitInfo.Arguments.Length, targetParams.Count);
     }
 
 

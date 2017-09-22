@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Authors>Roman Ivantsov</Authors>
     <Company>Roman Ivantsov</Company>
     <Description>.NET dynamic proxy emitter</Description>
@@ -11,9 +11,14 @@
     <RepositoryUrl>https://github.com/rivantsov/proxemity</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>.NET IL-Emit Proxy</PackageTags>
-    <PackageLicenseUrl>https://github.com/rivantsov/vita/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageLicenseUrl>https://github.com/rivantsov/proxemity/blob/master/LICENSE</PackageLicenseUrl>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>ProxemityKey.snk</AssemblyOriginatorKeyFile>
+    <NeutralLanguage>en-US</NeutralLanguage>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\netstandard2.0\Proxemity.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>

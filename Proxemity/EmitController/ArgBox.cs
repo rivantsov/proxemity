@@ -15,8 +15,8 @@ namespace Proxemity {
     ProxySelfRef,
   }
 
-  /// <summary>ArgBox is used by ProxyTargetMethodSelector call back method as a special value in one or more of the returned Arguments.
-  /// It tells emitter that an argument is a special value that must be interpreted/emitted in a certain way.  
+  /// <summary>ArgBox is used by Proxy emit controller call back method as a special value in one or more of the returned Arguments.
+  /// It tells the emitter that an argument is a special value that must be interpreted/emitted in a certain way.  
   /// </summary>
   public class ArgBox {
     public ArgBoxKind Kind { get; internal set; }
@@ -43,10 +43,11 @@ namespace Proxemity {
       if(target.NodeType == ExpressionType.Convert)
         target = ((UnaryExpression)target).Operand;
       var memberAccess = target as MemberExpression;
-      bool isOk = memberAccess != null && (memberAccess.Member.MemberType == MemberTypes.Field || memberAccess.Member.MemberType == MemberTypes.Property);
+      bool isOk = memberAccess != null &&
+        (memberAccess.Member.MemberType == MemberTypes.Field || memberAccess.Member.MemberType == MemberTypes.Property);
       Util.Check(isOk, errMsgTemplate, selector);
       var member = memberAccess.Member;
-      Util.Check(IsStatic(member), errMsgTemplate, selector);
+      Util.Check(member.IsStatic(), errMsgTemplate, selector);
       return new ArgBox() { Kind = ArgBoxKind.StaticInstanceRef, SingletonMember = member };
     }
 
@@ -54,15 +55,6 @@ namespace Proxemity {
       return new ArgBox() { Kind = ArgBoxKind.ProxySelfRef }; 
     }
 
-    private static bool IsStatic(MemberInfo member) {
-      var prop = member as PropertyInfo;
-      if(prop != null)
-        return prop.GetMethod.IsStatic;
-      var fld = member as FieldInfo;
-      if(fld != null)
-        return fld.IsStatic;
-      return false; 
-    }
 
   }//class
 

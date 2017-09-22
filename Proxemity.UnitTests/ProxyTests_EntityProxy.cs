@@ -13,7 +13,7 @@ namespace Proxemity.UnitTests {
     DynamicAssemblyInfo _dynamicAssembly;
 
     private DynamicAssemblyInfo GetAssembly() {
-      _dynamicAssembly = _dynamicAssembly ?? ProxyEmitter.CreateDynamicAssembly("Proxemity.UnitTests.Proxies");
+      _dynamicAssembly = _dynamicAssembly ?? DynamicAssemblyInfo.Create("Proxemity.UnitTests.Proxies");
       return _dynamicAssembly; 
     }
 
@@ -24,12 +24,12 @@ namespace Proxemity.UnitTests {
       var emitter = new ProxyEmitter(proxyInfo);
       var controller = new EntityEmitController();
       emitter.ImplementInterface(typeof(IMyEntity), controller);
-      var proxyType = emitter.CreateTypeInfo().AsType();
+      var proxyType = emitter.Complete();
 
       // create and setup target object 
-      var myEntity =  Activator.CreateInstance(proxyType);
-      var baseObj = (EntityBase)myEntity;
-      baseObj.Record = new EntityRecordMock();
+      var factory = proxyInfo.GetProxyFactory<Func<EntityBase>>();
+      var myEntity = factory();
+      myEntity.Record = new EntityRecordMock();
       // cast the entity instance to entity interface and test it
       var iMyEntity = myEntity as IMyEntity;
       Assert.IsNotNull(iMyEntity, "Failed to retrieve IMyEntity interface.");
