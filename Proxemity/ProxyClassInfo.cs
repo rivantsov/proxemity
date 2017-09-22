@@ -45,8 +45,8 @@ namespace Proxemity {
     /// <summary>List of functors describing the attributes to put on the emitted proxy class.</summary>
     public readonly IList<Expression<Func<Attribute>>> CustomAttributes = new List<Expression<Func<Attribute>>>();
 
-    /// <summary>The class (Type) of the generated proxy. Set by emitter when emit process is completed.</summary>
-    public Type ProxyClass { get; internal set; }
+    /// <summary>The class (Type) of the emitted proxy. Set by emitter when emit process is completed.</summary>
+    public Type EmittedClass { get; internal set; }
 
     /// <summary>Creates a proxy class info instance. </summary>
     /// <param name="assembly">Dynamic assembly information. Use <see cref="DynamicAssemblyInfo.Create"/> static factory method to create dynamic assembly.</param>
@@ -75,8 +75,8 @@ namespace Proxemity {
     /// The retun type of the Func must be the proxy base type. </typeparam>
     /// <returns>A function that creates an instance of the proxy.</returns>
     public TFunc GetProxyFactory<TFunc>() {
-      Util.Check(ProxyClass != null, "Proxy emit process not completed, proxy class and factories are not available. Call ProxyEmitter.Complete() to complete the process.");
-      var func = ProxemityUtil.GetFactory(ProxyClass, typeof(TFunc)); 
+      Util.Check(EmittedClass != null, "Proxy emit process not completed, proxy class and factories are not available. Call ProxyEmitter.Complete() to complete the process.");
+      var func = ProxemityUtil.GetFactory(EmittedClass, typeof(TFunc)); 
       return (TFunc)func; 
     }
   }//class

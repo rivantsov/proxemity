@@ -11,6 +11,7 @@ namespace Proxemity {
 
   /// <summary>IL Proxy emitter. Emits dynamic class implementing one or more interfaces. </summary>
   public class ProxyEmitter {
+    /// <summary>The name of the static factory method. </summary>
     public const string FactoryMethodName = "Create_";
 
     ProxyClassInfo _proxyClassInfo; 
@@ -70,19 +71,19 @@ namespace Proxemity {
 
     /// <summary>Returns true if emit process is completed and the type is created.</summary>
     public bool IsCompleted() {
-      return _proxyClassInfo.ProxyClass != null; 
+      return _proxyClassInfo.EmittedClass != null; 
     }
     /// <summary>Finalizes the emit process and creates a TypeInfo representing the emitted proxy class. </summary>
     /// <returns>Type representing the emitted class.</returns>
     /// <remarks>No more emit actions can be performed (ImplementInterface calls) after this method is called.
-    /// The proxy Type instance is also saved in the <see cref="ProxyClassInfo.ProxyClass"/> property of the class info.
+    /// The proxy Type instance is also saved in the <see cref="ProxyClassInfo.EmittedClass"/> property of the class info.
     /// </remarks>
     public Type Complete() {
       Util.Check(!IsCompleted(), "The emit process is already completed.");
       var typeInfo = _typeBuilder.CreateTypeInfo();
-      _proxyClassInfo.ProxyClass = typeInfo.AsType();
+      _proxyClassInfo.EmittedClass = typeInfo.AsType();
       _typeBuilder = null; 
-      return _proxyClassInfo.ProxyClass;
+      return _proxyClassInfo.EmittedClass;
     }
 
     
