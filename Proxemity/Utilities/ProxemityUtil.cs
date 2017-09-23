@@ -73,13 +73,13 @@ namespace Proxemity {
       }
     }
 
-    internal static object GetFactory(Type proxyType, Type funcType) {
+    internal static object GetFactoryMethod(Type proxyType, string methodName, Type funcType) {
       var genParams = funcType.GetGenericArguments();
       var returnType = genParams[genParams.Length - 1];
       Check(returnType.IsAssignableFrom(proxyType), "Invalid Func return type {0}; must be compatible with proxy base type {1}).", returnType, proxyType.BaseType);
       var paramTypes = genParams.Take(genParams.Length - 1).ToArray();
       // var flags = BindingFlags.Static | BindingFlags.Public;
-      var method = proxyType.GetMethod(ProxyEmitter.FactoryMethodName, paramTypes);
+      var method = proxyType.GetMethod(methodName, paramTypes);
       Check(method != null, "Factory method with provided parameter types not found.");
       var func = method.CreateDelegate(funcType);
       return func;

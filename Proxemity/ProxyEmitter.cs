@@ -11,8 +11,6 @@ namespace Proxemity {
 
   /// <summary>IL Proxy emitter. Emits dynamic class implementing one or more interfaces. </summary>
   public class ProxyEmitter {
-    /// <summary>The name of the static factory method. </summary>
-    public const string FactoryMethodName = "Create_";
 
     ProxyClassInfo _proxyClassInfo; 
     TypeBuilder _typeBuilder;
@@ -105,7 +103,7 @@ namespace Proxemity {
 
     private void BuildProxyFactory(ConstructorBuilder constr, Type[] paramTypes) {
       var attrs = MethodAttributes.HideBySig | MethodAttributes.RTSpecialName | MethodAttributes.SpecialName | MethodAttributes.Static | MethodAttributes.Public;
-      var meth = _typeBuilder.DefineMethod(FactoryMethodName, attrs, _typeBuilder, paramTypes);
+      var meth = _typeBuilder.DefineMethod(_proxyClassInfo.FactoryMethodName, attrs, _typeBuilder, paramTypes);
       var ilGen = meth.GetILGenerator(); 
       // load args
       for(int i = 0; i < paramTypes.Length; i++) {

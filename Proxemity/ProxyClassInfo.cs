@@ -15,6 +15,7 @@ namespace Proxemity {
     public readonly AssemblyBuilder AssemblyBuilder;
     /// <summary>Module builder.</summary>
     public readonly ModuleBuilder ModuleBuilder;
+
     /// <summary>Creates a new instance.</summary>
     public DynamicAssemblyInfo(AssemblyBuilder assemblyBuilder, ModuleBuilder moduleBuilder) {
       AssemblyBuilder = assemblyBuilder;
@@ -48,6 +49,9 @@ namespace Proxemity {
     /// <summary>The class (Type) of the emitted proxy. Set by emitter when emit process is completed.</summary>
     public Type EmittedClass { get; internal set; }
 
+    /// <summary>The name of emitted the static factory method(s). </summary>
+    public string FactoryMethodName = "Create_";
+
     /// <summary>Creates a proxy class info instance. </summary>
     /// <param name="assembly">Dynamic assembly information. Use <see cref="DynamicAssemblyInfo.Create"/> static factory method to create dynamic assembly.</param>
     /// <param name="className">The full class name of IL-emitted proxy, including namespace.</param>
@@ -76,7 +80,7 @@ namespace Proxemity {
     /// <returns>A function that creates an instance of the proxy.</returns>
     public TFunc GetProxyFactory<TFunc>() {
       Util.Check(EmittedClass != null, "Proxy emit process not completed, proxy class and factories are not available. Call ProxyEmitter.Complete() to complete the process.");
-      var func = ProxemityUtil.GetFactory(EmittedClass, typeof(TFunc)); 
+      var func = ProxemityUtil.GetFactoryMethod(EmittedClass, FactoryMethodName, typeof(TFunc)); 
       return (TFunc)func; 
     }
   }//class
