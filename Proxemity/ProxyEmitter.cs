@@ -147,7 +147,7 @@ namespace Proxemity {
       var intfMethodInfo = new InterfaceMemberInfo() { Member = iMethod, OwnerProperty = ownerProperty };
       var emitInfo = controller.GetEmitInfo(intfMethodInfo);
       //validate some basic things
-      ValidateTargetInfo(emitInfo, iMethod.Name); 
+      ValidateEmitInfo(emitInfo, iMethod.Name); 
 
       // start building method
       var iParams = iMethod.GetParameters().ToList();
@@ -328,14 +328,14 @@ namespace Proxemity {
       return attrBuilder; 
     }
 
-    private void ValidateTargetInfo(EmitInfo emitInfo, string iMethodName) {
+    private void ValidateEmitInfo(EmitInfo emitInfo, string iMethodName) {
       var targetRef = emitInfo.TargetRef;
-      Util.Check(targetRef != null, "TargetMethodInfo.TargetRef may not be null; method name: {0}", iMethodName);
+      Util.Check(targetRef != null, "EmitInfo.TargetRef may not be null; method name: {0}", iMethodName);
       Util.Check(targetRef.MemberType == MemberTypes.Field || targetRef.MemberType == MemberTypes.Property,
-        "Invalid target ref type: {0}, expected field or property.", targetRef.MemberType);
+        "Invalid target ref member type: {0}, expected field or property.", targetRef.MemberType);
       var targetParams = emitInfo.TargetMethod.GetParameters().ToList();
       Util.Check(targetParams.Count == emitInfo.Arguments.Length,
-            "Invalid TargetInfo for method {0}, arg count {1} does not match target method parameter count {2}",
+            "Invalid EmitInfo for method {0}, arg count {1} does not match target method parameter count {2}",
                    iMethodName, emitInfo.Arguments.Length, targetParams.Count);
     }
 

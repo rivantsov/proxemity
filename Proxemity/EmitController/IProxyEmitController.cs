@@ -8,13 +8,12 @@ using System.Text;
 namespace Proxemity {
   using Util = ProxemityUtil;
 
-
   public class InterfaceMemberInfo {
     public MemberInfo Member;
     public PropertyInfo OwnerProperty; //for getters/setters only
   }
 
-  /// <summary>Information to use when emitting a member; returned by emit controller provided by client code.</summary>
+  /// <summary>Information to use when emitting a member; returned by the emit controller provided by client code.</summary>
   public class EmitInfo {
     public MemberInfo TargetRef;
     public MethodInfo TargetMethod;
