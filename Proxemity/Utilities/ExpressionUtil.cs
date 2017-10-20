@@ -52,6 +52,7 @@ namespace Proxemity {
       return res;
     }
 
+
     private static object Evaluate(Expression expr) {
       switch(expr) {
         case ConstantExpression ce:
@@ -64,5 +65,45 @@ namespace Proxemity {
     }
 
 
-  }
+    internal static AttributeConstructorInfo ParseAttributeClonerExpression(LambdaExpression cloner, Attribute attrInstance) {
+      var attrParam = cloner.Parameters[0];
+      // VerifyAttributeExpression(cloner);
+      var res = new AttributeConstructorInfo();
+      // We might have 2 cases: 
+      //  body is NewExpression - call to constructor only ( ()=> new A(1, 2, 3); )
+      //  body is MemberInit expr - call to constructor with extra property initialization ( ()=> new A(1, 2, 3) {p = smth}; )
+      NewExpression newExpr;
+      if(cloner.Body.NodeType == ExpressionType.MemberInit) {
+        var initExpr = (MemberInitExpression)cloner.Body;
+        newExpr = initExpr.NewExpression;
+        //Check that every binding is an assignment
+        var firstNonAssignment = initExpr.Bindings.FirstOrDefault(b => b.BindingType != MemberBindingType.Assignment);
+        Util.Check(firstNonAssignment == null, "Invalid attribute initialization expression for member {0}, must be assignment.", firstNonAssignment?.Member.Name);
+        var bindings = initExpr.Bindings.OfType<MemberAssignment>().ToList();
+        var propBindings = bindings.Where(b => b.Member.MemberType == MemberTypes.Property).ToList();
+        res.Properties = propBindings.Select(b => (PropertyInfo)b.Member).ToArray();
+        res.PropertyValues = propBindings.Select(b => Evaluate2(b.Expression, attrParam, attrInstance)).ToArray();
+        var fieldBindings = bindings.Where(b => b.Member.MemberType == MemberTypes.Field).ToList();
+        res.Fields = fieldBindings.Select(b => (FieldInfo)b.Member).ToArray();
+        res.FieldValues = fieldBindings.Select(b => Evaluate2(b.Expression, attrParam, attrInstance)).ToArray();
+      } else {
+        newExpr = (NewExpression)cloner.Body;
+      }
+      res.Constructor = newExpr.Constructor;
+      res.Args = newExpr.Arguments.Select(ae => Evaluate2(ae, attrParam, attrInstance)).ToArray();
+      return res;
+    }
+    private static object Evaluate2(Expression expr, ParameterExpression attrParam, Attribute attr) {
+      switch(expr) {
+        case ConstantExpression ce:
+          return ce.Value;
+        default:
+          var fn = Expression.Lambda(expr, attrParam).Compile();
+          var result = fn.DynamicInvoke(attr);
+          return result;
+      }
+    }
+
+
+  }//class
 }

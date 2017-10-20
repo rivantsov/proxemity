@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Proxemity.UnitTests.Samples {
+namespace Proxemity.UnitTests.SampleProxy {
   //Used to analyze IL in SampleHandCodedProxy class in output assembly using Reflector
 
   public interface IProxyTarget{

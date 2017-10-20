@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
@@ -83,8 +85,14 @@ namespace Proxemity {
       Check(method != null, "Factory method with provided parameter types not found.");
       var func = method.CreateDelegate(funcType);
       return func;
-
     }
+
+    // this method is needed to convert Func<Attr> to Expression<Func<Attr>>
+    private static void AddFactory(IList<Expression<Func<Attribute>>> factories,  Expression<Func<Attribute>> factory) {
+      factories.Add(factory);
+    }
+
+
 
   } //class
 

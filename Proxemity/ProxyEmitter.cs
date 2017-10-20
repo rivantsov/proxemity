@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -10,81 +11,98 @@ namespace Proxemity {
   using Util = ProxemityUtil;
 
   /// <summary>IL Proxy emitter. Emits dynamic class implementing one or more interfaces. </summary>
+  /// <remarks>Uses a controller - a sub-class of <see cref="ProxyEmitControllerBase"/> class provided by 
+  /// the client code - that provides the information about target methods to call from emitted proxy 
+  /// methods. </remarks>
   public class ProxyEmitter {
 
-    ProxyClassInfo _proxyClassInfo; 
+    ProxyEmitControllerBase _controller; 
     TypeBuilder _typeBuilder;
-    IList<MethodBuilder> _builtMethods;
+    HashSet<string> _gettersSetters;
+
+    /// <summary>The class (Type) of the emitted proxy. Set by emitter when emit process is completed.</summary>
+    public Type EmittedClass { get; internal set; }
 
     /// <summary>Creates an instance of the ProxyEmitter class. </summary>
-    /// <param name="proxyClassInfo">The information about the proxy class to emit.</param>
-    public ProxyEmitter(ProxyClassInfo proxyClassInfo) {
-      Util.CheckParam(proxyClassInfo, nameof(proxyClassInfo));
-      _proxyClassInfo = proxyClassInfo;
-      _typeBuilder = _proxyClassInfo.Assembly.ModuleBuilder.DefineType(_proxyClassInfo.ClassName, TypeAttributes.Class, parent: _proxyClassInfo.BaseType);
+    /// <param name="controller">The information about the proxy class to emit.</param>
+    public ProxyEmitter(ProxyEmitControllerBase controller) {
+      Util.CheckParam(controller, nameof(controller));
+      _controller = controller;
+      _typeBuilder = _controller.Assembly.ModuleBuilder.DefineType(_controller.ClassName, TypeAttributes.Class, parent: _controller.BaseType);
       // Constructors
-      var constrList = _proxyClassInfo.BaseType.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+      var constrList = _controller.BaseType.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
       foreach(var constr in constrList)
         BuildConstructor(constr);
-      //Attributes 
-      foreach(var attrExpr in _proxyClassInfo.CustomAttributes)
-          _typeBuilder.SetCustomAttribute(CreateAttributeBuilder(attrExpr));
     } //constr
 
     /// <summary>Implements interface on a proxy class - emits members of the interface.</summary>
     /// <param name="interfaceType">Interface type.</param>
-    /// <param name="controller">Emit controller - an object that will provide details about emitting 
-    /// interface members, one at a time.</param>
-    public void ImplementInterface(Type interfaceType, IProxyEmitController controller) {
-      Util.Check(!IsCompleted(), "The proxy class had been finalized and created, cannot add interface.");
+    public void ImplementInterface(Type interfaceType) {
+      Util.Check(EmittedClass == null, "The proxy class had been finalized and created, cannot add interface.");
       Util.CheckParam(interfaceType, nameof(interfaceType));
-      Util.CheckParam(controller, nameof(controller));
       Util.Check(interfaceType.IsInterface, "Invalid interfaceType argument - expected interface type, provided: {0}.", interfaceType);
-
       _typeBuilder.AddInterfaceImplementation(interfaceType);
 
-      _builtMethods = new List<MethodBuilder>();
+      _gettersSetters = new HashSet<string>();
       var allProperties = interfaceType.GetAllProperties();
       var allMethods = interfaceType.GetAllMethods();
       //Properties
       foreach(var iProp in allProperties) {
-        BuildProperty(controller, iProp);
+        BuildProperty(iProp);
       }
       //Methods
       foreach(var iMeth in allMethods) {
         // some methods (getters/setters) are implemented when building properties - skip these 
-        var alreadyDone = _builtMethods.FirstOrDefault(m => m.Name == iMeth.Name);
-        if(alreadyDone != null)
+        if(_gettersSetters.Contains(iMeth.Name))
           continue;
-        BuildMethod(controller, iMeth);
+        BuildMethod(iMeth);
       }
+      //Attributes
+      if (_controller.AttributeHandler != null) {
+        var allAttrs = interfaceType.GetCustomAttributes(inherit: true).OfType<Attribute>().ToList();
+        var attrBuilders = CreateAttributeBuilders(allAttrs);
+        foreach(var atb in attrBuilders)
+          _typeBuilder.SetCustomAttribute(atb);
+      }
+      // call controller to review imlementation
+      _controller.OnInterfaceImplemented(interfaceType, _typeBuilder);
     }//method
 
-    /// <summary>Returns current type builder. You can use it to customize the emitted type before it is finalized and created by <see cref="Complete"/> method. </summary>
-    /// <returns>Type builder instance.</returns>
-    public TypeBuilder GetTypeBuilder() {
-      Util.Check(!IsCompleted(), "The proxy class had been finalized and created, type builder is not available.");
-      return _typeBuilder; 
-    }
-
-    /// <summary>Returns true if emit process is completed and the type is created.</summary>
-    public bool IsCompleted() {
-      return _proxyClassInfo.EmittedClass != null; 
-    }
-    /// <summary>Finalizes the emit process and creates a TypeInfo representing the emitted proxy class. </summary>
+    /// <summary>Finalizes the emit process and creates a Type representing the emitted proxy class. </summary>
     /// <returns>Type representing the emitted class.</returns>
     /// <remarks>No more emit actions can be performed (ImplementInterface calls) after this method is called.
-    /// The proxy Type instance is also saved in the <see cref="ProxyClassInfo.EmittedClass"/> property of the class info.
+    /// The proxy Type instance is also saved in the <see cref="EmittedClass"/> property.
     /// </remarks>
-    public Type Complete() {
-      Util.Check(!IsCompleted(), "The emit process is already completed.");
+    public Type CreateClass() {
+      Util.Check(EmittedClass == null, "The emit process is already completed.");
+      // last call to controller before finalizing and creating type. Last chance for controller to add smth.
+      _controller.OnClassEmitted(_typeBuilder);
+      //actually create type
       var typeInfo = _typeBuilder.CreateTypeInfo();
-      _proxyClassInfo.EmittedClass = typeInfo.AsType();
+      EmittedClass = typeInfo.AsType();
       _typeBuilder = null; 
-      return _proxyClassInfo.EmittedClass;
+      return EmittedClass;
     }
 
-    
+    /// <summary>Returns a proxy factory method corresponding to a constructor with parameter types matching the type arguments of the Func type parameter.</summary>
+    /// <typeparam name="TFunc">Func-based generic delegate. The type arguments must match the types of arguments of one of the constructors of the proxy class.
+    /// The retun type of the Func must be the proxy base type. </typeparam>
+    /// <returns>A function that creates an instance of the proxy.</returns>
+    public TFunc GetProxyFactory<TFunc>() {
+      Util.Check(EmittedClass != null, "Proxy emit process not completed, proxy class and factories are not available. Call ProxyEmitter.Complete() to complete the process.");
+      var func = ProxemityUtil.GetFactoryMethod(EmittedClass, _controller.FactoryMethodName, typeof(TFunc));
+      return (TFunc)func;
+    }
+
+    /// <summary>Returns current type builder. You can use it to customize the emitted type before it is finalized and created by <see cref="CreateClass"/> method. </summary>
+    /// <returns>Type builder instance.</returns>
+    public TypeBuilder GetTypeBuilder() {
+      Util.Check(EmittedClass == null, "The proxy class had been finalized and created, type builder is not available.");
+      return _typeBuilder;
+    }
+
+    // Private methods ====================================================================================
+
     private ConstructorBuilder BuildConstructor(ConstructorInfo constructor) {
       var attrs = MethodAttributes.HideBySig | MethodAttributes.RTSpecialName | MethodAttributes.SpecialName;
       if (constructor.IsPublic)
@@ -103,7 +121,7 @@ namespace Proxemity {
 
     private void BuildProxyFactory(ConstructorBuilder constr, Type[] paramTypes) {
       var attrs = MethodAttributes.HideBySig | MethodAttributes.RTSpecialName | MethodAttributes.SpecialName | MethodAttributes.Static | MethodAttributes.Public;
-      var meth = _typeBuilder.DefineMethod(_proxyClassInfo.FactoryMethodName, attrs, _typeBuilder, paramTypes);
+      var meth = _typeBuilder.DefineMethod(_controller.FactoryMethodName, attrs, _typeBuilder, paramTypes);
       var ilGen = meth.GetILGenerator(); 
       // load args
       for(int i = 0; i < paramTypes.Length; i++) {
@@ -114,38 +132,42 @@ namespace Proxemity {
       ilGen.Emit(OpCodes.Ret);
     }
 
-    private PropertyBuilder BuildProperty(IProxyEmitController controller, PropertyInfo iprop) {
+    private PropertyBuilder BuildProperty(PropertyInfo iprop) {
       var interfaceType = iprop.DeclaringType; 
       var pb = _typeBuilder.DefineProperty(iprop.Name, PropertyAttributes.None, iprop.PropertyType, Type.EmptyTypes);
-      var intfPropInfo = new InterfaceMemberInfo() { Member = iprop };
-      var emitInfo = controller.GetEmitInfo(intfPropInfo);
 
       if(iprop.GetMethod != null) {
-        var getter = BuildMethod(controller, iprop.GetMethod, iprop);
+        var getter = BuildMethod(iprop.GetMethod, iprop);
         pb.SetGetMethod(getter);
         var igetter = interfaceType.GetMethod(iprop.GetMethod.Name);
         _typeBuilder.DefineMethodOverride(getter, igetter);
+        _gettersSetters.Add(getter.Name);
       }
       if(iprop.SetMethod != null) {
-        var setter = BuildMethod(controller, iprop.SetMethod, iprop);
+        var setter = BuildMethod(iprop.SetMethod, iprop);
         pb.SetSetMethod(setter);
         var isetter = interfaceType.GetMethod(iprop.SetMethod.Name);
         _typeBuilder.DefineMethodOverride(setter, isetter);
+        _gettersSetters.Add(setter.Name);
       }
       //Attributes
-      foreach(var attrExpr in emitInfo.CustomAttributes)
-        pb.SetCustomAttribute(CreateAttributeBuilder(attrExpr));
-      // ReviewCallback
-      // Note: do not try to change to shortcut targetPropInfo?.ReviewCallback, for some reason it blows up
-      if(emitInfo.ReviewCallback != null)
-        emitInfo.ReviewCallback(pb); 
+      // foreach(var attrExpr in emitInfo.AttributeFactories)
+      // pb.SetCustomAttribute(CreateAttributeBuilder(attrExpr));
+
+      //Attributes
+      if(_controller.AttributeHandler != null) {
+        var allAttrs = iprop.GetCustomAttributes(inherit: true).OfType<Attribute>().ToList();
+        var attrBuilders = CreateAttributeBuilders(allAttrs);
+        foreach(var atb in attrBuilders)
+          pb.SetCustomAttribute(atb);
+      }
+      _controller.OnPropertyEmitted(iprop, pb);
       return pb;
     } //method
 
-    private MethodBuilder BuildMethod(IProxyEmitController controller, MethodInfo iMethod, PropertyInfo ownerProperty = null) {
+    private MethodBuilder BuildMethod(MethodInfo iMethod, PropertyInfo ownerProperty = null) {
       // Invoke controller to get emit info with target method
-      var intfMethodInfo = new InterfaceMemberInfo() { Member = iMethod, OwnerProperty = ownerProperty };
-      var emitInfo = controller.GetEmitInfo(intfMethodInfo);
+      var emitInfo = _controller.GetMethodEmitInfo(iMethod, ownerProperty);
       //validate some basic things
       ValidateEmitInfo(emitInfo, iMethod.Name); 
 
@@ -154,7 +176,6 @@ namespace Proxemity {
       var prmTypes = iParams.Select(p => p.ParameterType).ToArray();
       var attrs = MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.Public;
       var mb = _typeBuilder.DefineMethod(iMethod.Name, attrs, iMethod.ReturnType, prmTypes);
-      _builtMethods.Add(mb);
       if(ownerProperty == null)
         _typeBuilder.DefineMethodOverride(mb, iMethod);
 
@@ -175,16 +196,31 @@ namespace Proxemity {
       //return
       ilGen.Emit(OpCodes.Ret);
       //custom attributes
-      foreach(var attrExpr in emitInfo.CustomAttributes)
-        mb.SetCustomAttribute(CreateAttributeBuilder(attrExpr));
-      //Invoke review callback if provided
-      // Note: do not try to change to shortcut emitInfo?.ReviewCallback, for some reason it blows up
-      if(emitInfo.ReviewCallback != null)
-        emitInfo.ReviewCallback(mb); 
+      if (_controller.AttributeHandler != null) {
+        var allAttrs = iMethod.GetCustomAttributes(inherit: true).OfType<Attribute>().ToList();
+        var attrBuilders = CreateAttributeBuilders(allAttrs);
+        foreach(var clone in attrBuilders)
+          mb.SetCustomAttribute(clone);
+      }
+
+      _controller.OnMethodEmitted(iMethod, mb);
       return mb;
     }
 
-    private void PushTargetRef(ILGenerator ilGen, EmitInfo emitInfo) {
+    private IList<CustomAttributeBuilder> CreateAttributeBuilders(IList<Attribute> attrs) {
+      var result = new List<CustomAttributeBuilder>();
+      if(_controller.AttributeHandler == null)
+        return result; 
+      foreach(var lambda in this._controller.AttributeHandler.Descriptors) {
+        var attrType = lambda.Body.Type;
+        var attrsOfType = attrs.Where(a => a.GetType() == attrType).ToList();
+        foreach(var attr in attrsOfType)
+          result.Add(CreateAttributeBuilderFromCloner(lambda, attr));
+      }
+      return result;
+    }
+
+    private void PushTargetRef(ILGenerator ilGen, MemberEmitInfo emitInfo) {
       // push ref to target from field/prop
       var targetRef = emitInfo.TargetRef; 
       switch(targetRef) {
@@ -243,7 +279,7 @@ namespace Proxemity {
       switch(argBox.Kind) {
         case ArgBoxKind.ProxySelfRef:
           ilGen.Emit(OpCodes.Ldarg_0); //load ref to self 
-          ConvertValueIfNeeded(ilGen, _proxyClassInfo.BaseType, expectedType, iMethod);
+          ConvertValueIfNeeded(ilGen, _controller.BaseType, expectedType, iMethod);
           break;
         case ArgBoxKind.StaticInstanceRef:
           var member = argBox.SingletonMember;
@@ -327,8 +363,13 @@ namespace Proxemity {
       var attrBuilder = new CustomAttributeBuilder(cInfo.Constructor, cInfo.Args, cInfo.Properties, cInfo.PropertyValues, cInfo.Fields, cInfo.FieldValues); //, constrArgs, named)
       return attrBuilder; 
     }
+    private CustomAttributeBuilder CreateAttributeBuilderFromCloner(LambdaExpression cloner, Attribute attr) {
+      var cInfo = ExpressionUtil.ParseAttributeClonerExpression(cloner, attr);
+      var attrBuilder = new CustomAttributeBuilder(cInfo.Constructor, cInfo.Args, cInfo.Properties, cInfo.PropertyValues, cInfo.Fields, cInfo.FieldValues); //, constrArgs, named)
+      return attrBuilder;
 
-    private void ValidateEmitInfo(EmitInfo emitInfo, string iMethodName) {
+    }
+    private void ValidateEmitInfo(MemberEmitInfo emitInfo, string iMethodName) {
       var targetRef = emitInfo.TargetRef;
       Util.Check(targetRef != null, "EmitInfo.TargetRef may not be null; method name: {0}", iMethodName);
       Util.Check(targetRef.MemberType == MemberTypes.Field || targetRef.MemberType == MemberTypes.Property,
