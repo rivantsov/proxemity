@@ -6,10 +6,6 @@ using System.Text;
 
 namespace Proxemity.UnitTests {
 
-  /*
-   Models a simple interface with methods
-   
-   */ 
 
   // We test that when interface (to build proxy for) is inherited from other interface, it all works ok
   public interface IBaseFuncInterface {
@@ -25,19 +21,17 @@ namespace Proxemity.UnitTests {
     int IntMethod(DateTime d, object e);
   }
 
-  // simple class to use as a singleton - to test ArgBox
+  // Simple singleton class to use as target method parameter - to test ArgBox
   public class Singleton {
     // these static singletons are used in tests
     public static Singleton InstanceProp { get; set; } = new Singleton() { Id = 1 };
     public static Singleton InstanceField = new Singleton() { Id = 2 };
-
 
     public int Id;
     public override string ToString() { return Id.ToString(); }
   }
 
   public class FuncProxyBase {
-
     public FuncProxyTarget Target { get; }
 
     public FuncProxyBase(FuncProxyTarget target) {
@@ -66,22 +60,22 @@ namespace Proxemity.UnitTests {
         : base(assemblyInfo, "Proxemity.UnitTests.EmittedClasses.FuncProxy", typeof(FuncProxyBase),
                new SampleAttributeHandler()) { }
 
-    public override MemberEmitInfo GetMethodEmitInfo(MethodInfo interfaceMethod, PropertyInfo ownerProperty = null) {
+    public override MethodEmitInfo GetMethodEmitInfo(MethodInfo interfaceMethod, PropertyInfo ownerProperty = null) {
       // We want to pass all incoming arguments of the call in one array-type argument; generate smth like: 
       //  -- generated proxy method
       //   public object Foo(a, b, c) {
       //     return Target.MethodCalled("Foo", new object[] {a, b, c});
       //   }
       // For args we use ArgBox.CreateArray that will let emitter know that the arg is a special thing - an array of all arguments passed to the method
+      // We also add extra value which contains another array (of extra values) to test ArgBox special functions
       var paramRefArray = ArgBox.CreateArray(interfaceMethod.GetParameters());
-      // We also pass extra values array to test ArgBox special functions
       var extra1 = ArgBox.CreateProxySelfRef(); //reference to proxy intance
       var extra2 = ArgBox.CreateStaticInstanceRef(() => Singleton.InstanceField); //reference to singleton
       var extra3 = ArgBox.CreateStaticInstanceRef(() => Singleton.InstanceProp);
       var extraValuesArray = ArgBox.CreateArray( new object[] { extra1, extra2, extra3});
       // final args array
       var args = new object[] { interfaceMethod.Name, paramRefArray,  extraValuesArray  };
-      var emitInfo = new MemberEmitInfo(interfaceMethod, _targetRef, _targetMethod, args);
+      var emitInfo = new MethodEmitInfo(interfaceMethod, _targetRef, _targetMethod, args);
       return emitInfo;
     }//method
 

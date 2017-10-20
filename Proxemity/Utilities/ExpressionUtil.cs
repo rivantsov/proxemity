@@ -8,7 +8,8 @@ namespace Proxemity {
   using Util = ProxemityUtil; 
 
   internal static class ExpressionUtil {
-    internal static void VerifyAttributeExpression(Expression<Func<Attribute>> expr) {
+
+    internal static void VerifyAttributeDescriptor<TAttribute>(Expression<Func<TAttribute, TAttribute>> expr) where TAttribute : Attribute {
       Util.Check(expr != null, "Attribute expression parameter may not be null.");
       Util.Check(expr.Body.NodeType == ExpressionType.New || expr.Body.NodeType == ExpressionType.MemberInit,
         "Invalid attribute expression, must be a New expression, for ex: '()=>new DescriptionAttribute(descr)'. "
@@ -24,76 +25,41 @@ namespace Proxemity {
       public object[] FieldValues = new object[] { };
     }
 
-    internal static AttributeConstructorInfo ParseAttributeExpression(Expression<Func<Attribute>> expr) {
-      VerifyAttributeExpression(expr);
-      var res = new AttributeConstructorInfo();
-      // We might have 2 cases: 
-      //  body is NewExpression - call to constructor only ( ()=> new A(1, 2, 3); )
-      //  body is MemberInit expr - call to constructor with extra property initialization ( ()=> new A(1, 2, 3) {p = smth}; )
-      NewExpression newExpr;
-      if(expr.Body.NodeType == ExpressionType.MemberInit) {
-        var initExpr = (MemberInitExpression)expr.Body;
-        newExpr = initExpr.NewExpression;
-        var firstBad = initExpr.Bindings.FirstOrDefault(b => b.BindingType != MemberBindingType.Assignment);
-        Util.Check(firstBad == null, "Invalid attribute initialization expression for member {0}, must be assignment.", firstBad?.Member.Name);
-        var bindings = initExpr.Bindings.OfType<MemberAssignment>().ToList();
-        var propBindings = bindings.Where(b => b.Member.MemberType == MemberTypes.Property).ToList();
-        res.Properties = propBindings.Select(b => (PropertyInfo)b.Member).ToArray();
-        res.PropertyValues = propBindings.Select(b => Evaluate(b.Expression)).ToArray();
-        var fieldBindings = bindings.Where(b => b.Member.MemberType == MemberTypes.Field).ToList();
-        res.Fields = fieldBindings.Select(b => (FieldInfo)b.Member).ToArray();
-        res.FieldValues = fieldBindings.Select(b => Evaluate(b.Expression)).ToArray();
-      } else {
-
-        newExpr = (NewExpression)expr.Body;
-      }
-      res.Constructor = newExpr.Constructor;
-      res.Args = newExpr.Arguments.Select(ae => Evaluate(ae)).ToArray();
-      return res;
-    }
-
-
-    private static object Evaluate(Expression expr) {
-      switch(expr) {
-        case ConstantExpression ce:
-          return ce.Value;
-        default:
-          var fn = Expression.Lambda(expr).Compile();
-          var result = fn.DynamicInvoke();
-          return result;
-      }
-    }
-
-
-    internal static AttributeConstructorInfo ParseAttributeClonerExpression(LambdaExpression cloner, Attribute attrInstance) {
-      var attrParam = cloner.Parameters[0];
+    internal static AttributeConstructorInfo ParseAttributeDescriptor(LambdaExpression descriptor, Attribute attrInstance) {
+      var attrParam = descriptor.Parameters[0];
       // VerifyAttributeExpression(cloner);
       var res = new AttributeConstructorInfo();
       // We might have 2 cases: 
       //  body is NewExpression - call to constructor only ( ()=> new A(1, 2, 3); )
       //  body is MemberInit expr - call to constructor with extra property initialization ( ()=> new A(1, 2, 3) {p = smth}; )
-      NewExpression newExpr;
-      if(cloner.Body.NodeType == ExpressionType.MemberInit) {
-        var initExpr = (MemberInitExpression)cloner.Body;
-        newExpr = initExpr.NewExpression;
-        //Check that every binding is an assignment
-        var firstNonAssignment = initExpr.Bindings.FirstOrDefault(b => b.BindingType != MemberBindingType.Assignment);
-        Util.Check(firstNonAssignment == null, "Invalid attribute initialization expression for member {0}, must be assignment.", firstNonAssignment?.Member.Name);
-        var bindings = initExpr.Bindings.OfType<MemberAssignment>().ToList();
-        var propBindings = bindings.Where(b => b.Member.MemberType == MemberTypes.Property).ToList();
-        res.Properties = propBindings.Select(b => (PropertyInfo)b.Member).ToArray();
-        res.PropertyValues = propBindings.Select(b => Evaluate2(b.Expression, attrParam, attrInstance)).ToArray();
-        var fieldBindings = bindings.Where(b => b.Member.MemberType == MemberTypes.Field).ToList();
-        res.Fields = fieldBindings.Select(b => (FieldInfo)b.Member).ToArray();
-        res.FieldValues = fieldBindings.Select(b => Evaluate2(b.Expression, attrParam, attrInstance)).ToArray();
-      } else {
-        newExpr = (NewExpression)cloner.Body;
+      NewExpression newExpr = null;
+      switch(descriptor.Body.NodeType) {
+        case ExpressionType.MemberInit:
+          var initExpr = (MemberInitExpression)descriptor.Body;
+          newExpr = initExpr.NewExpression;
+          //Check that every binding is an assignment
+          var firstNonAssignment = initExpr.Bindings.FirstOrDefault(b => b.BindingType != MemberBindingType.Assignment);
+          Util.Check(firstNonAssignment == null, "Invalid attribute initialization expression for member {0}, must be assignment.", firstNonAssignment?.Member.Name);
+          var bindings = initExpr.Bindings.OfType<MemberAssignment>().ToList();
+          var propBindings = bindings.Where(b => b.Member.MemberType == MemberTypes.Property).ToList();
+          res.Properties = propBindings.Select(b => (PropertyInfo)b.Member).ToArray();
+          res.PropertyValues = propBindings.Select(b => Evaluate(b.Expression, attrParam, attrInstance)).ToArray();
+          var fieldBindings = bindings.Where(b => b.Member.MemberType == MemberTypes.Field).ToList();
+          res.Fields = fieldBindings.Select(b => (FieldInfo)b.Member).ToArray();
+          res.FieldValues = fieldBindings.Select(b => Evaluate(b.Expression, attrParam, attrInstance)).ToArray();
+          break;
+        case ExpressionType.New:
+          newExpr = (NewExpression)descriptor.Body;
+          break;
+        default:
+          Util.Throw("Invalid attribute descriptor expression, must be 'new' operator. Expression: {0}", descriptor.Body);
+          break; 
       }
       res.Constructor = newExpr.Constructor;
-      res.Args = newExpr.Arguments.Select(ae => Evaluate2(ae, attrParam, attrInstance)).ToArray();
+      res.Args = newExpr.Arguments.Select(ae => Evaluate(ae, attrParam, attrInstance)).ToArray();
       return res;
     }
-    private static object Evaluate2(Expression expr, ParameterExpression attrParam, Attribute attr) {
+    private static object Evaluate(Expression expr, ParameterExpression attrParam, Attribute attr) {
       switch(expr) {
         case ConstantExpression ce:
           return ce.Value;

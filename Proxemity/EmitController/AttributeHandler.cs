@@ -6,6 +6,8 @@ using System.Linq.Expressions;
 using System.Text;
 
 namespace Proxemity {
+  // TODO: optimize handler for reuse - cache some info, avoid calling expr.Compile each time we need to evaluate expression.
+
   /// <summary>A class containing logic for handling custom attributes on interface (type and members). 
   /// The attributes can be copied to the corresponding type and members of the generated proxy class. </summary>
   public class AttributeHandler {
@@ -26,6 +28,7 @@ namespace Proxemity {
     ///   a => new CategoryAttribute(a.Category) .</param>
     public void AddDescriptor<TAttribute>(Expression<Func<TAttribute, TAttribute>> descriptor)
                                               where TAttribute : Attribute {
+      ExpressionUtil.VerifyAttributeDescriptor(descriptor); 
       this.Descriptors.Add(descriptor);
     }
 

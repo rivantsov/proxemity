@@ -42,7 +42,7 @@ namespace Proxemity {
     /// <returns>Emit info object.</returns>
     /// <remarks>The method is called for methods and properties getters/setters. The returned object provides the information 
     /// about the target method to call and its arguments. </remarks>
-    public abstract MemberEmitInfo GetMethodEmitInfo(MethodInfo interfaceMethod, PropertyInfo parentProperty = null);
+    public abstract MethodEmitInfo GetMethodEmitInfo(MethodInfo interfaceMethod, PropertyInfo parentProperty = null);
 
     /// <summary>Called by the emitter after the proxy method is emitted.</summary>
     /// <param name="interfaceMethod">Interface member.</param>

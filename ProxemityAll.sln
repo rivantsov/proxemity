@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26730.12
+VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Proxemity", "Proxemity\Proxemity.csproj", "{0AD3AC27-A5C2-48BC-A7B4-7FDFABFB0C1D}"
 EndProject
@@ -9,7 +9,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Proxemity.UnitTests", "Prox
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{18A83943-E1D8-4D78-A7BE-6A03611775F7}"
 	ProjectSection(SolutionItems) = preProject
-		Licence.txt = Licence.txt
 		ReadMe.md = ReadMe.md
 	EndProjectSection
 EndProject

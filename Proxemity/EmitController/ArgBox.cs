@@ -32,7 +32,7 @@ namespace Proxemity {
     /// <summary>Returns string representation of an object. </summary>
     /// <returns>String representation.</returns>
     public override string ToString() {
-      return "(" + Kind.ToString() + ")"; 
+      return "(" + Kind + ")"; 
     }
 
     //Static factory methods

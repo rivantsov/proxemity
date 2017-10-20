@@ -211,16 +211,16 @@ namespace Proxemity {
       var result = new List<CustomAttributeBuilder>();
       if(_controller.AttributeHandler == null)
         return result; 
-      foreach(var lambda in this._controller.AttributeHandler.Descriptors) {
-        var attrType = lambda.Body.Type;
+      foreach(var descr in this._controller.AttributeHandler.Descriptors) {
+        var attrType = descr.Body.Type;
         var attrsOfType = attrs.Where(a => a.GetType() == attrType).ToList();
         foreach(var attr in attrsOfType)
-          result.Add(CreateAttributeBuilderFromCloner(lambda, attr));
+          result.Add(CreateAttributeBuilder(descr, attr));
       }
       return result;
     }
 
-    private void PushTargetRef(ILGenerator ilGen, MemberEmitInfo emitInfo) {
+    private void PushTargetRef(ILGenerator ilGen, MethodEmitInfo emitInfo) {
       // push ref to target from field/prop
       var targetRef = emitInfo.TargetRef; 
       switch(targetRef) {
@@ -358,18 +358,13 @@ namespace Proxemity {
 
     }
 
-    private CustomAttributeBuilder CreateAttributeBuilder(Expression<Func<Attribute>> attrExpr) {
-      var cInfo = ExpressionUtil.ParseAttributeExpression(attrExpr);
-      var attrBuilder = new CustomAttributeBuilder(cInfo.Constructor, cInfo.Args, cInfo.Properties, cInfo.PropertyValues, cInfo.Fields, cInfo.FieldValues); //, constrArgs, named)
-      return attrBuilder; 
-    }
-    private CustomAttributeBuilder CreateAttributeBuilderFromCloner(LambdaExpression cloner, Attribute attr) {
-      var cInfo = ExpressionUtil.ParseAttributeClonerExpression(cloner, attr);
+    private CustomAttributeBuilder CreateAttributeBuilder(LambdaExpression cloner, Attribute attr) {
+      var cInfo = ExpressionUtil.ParseAttributeDescriptor(cloner, attr);
       var attrBuilder = new CustomAttributeBuilder(cInfo.Constructor, cInfo.Args, cInfo.Properties, cInfo.PropertyValues, cInfo.Fields, cInfo.FieldValues); //, constrArgs, named)
       return attrBuilder;
 
     }
-    private void ValidateEmitInfo(MemberEmitInfo emitInfo, string iMethodName) {
+    private void ValidateEmitInfo(MethodEmitInfo emitInfo, string iMethodName) {
       var targetRef = emitInfo.TargetRef;
       Util.Check(targetRef != null, "EmitInfo.TargetRef may not be null; method name: {0}", iMethodName);
       Util.Check(targetRef.MemberType == MemberTypes.Field || targetRef.MemberType == MemberTypes.Property,

@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Text;
 
 namespace Proxemity.UnitTests.SampleProxy {
-  //Used to analyze IL in SampleHandCodedProxy class in output assembly using Reflector
+
+  // This class was used to view/analyze IL code in output assembly using Reflector
 
   public interface IProxyTarget{
     object GetValue(string name);

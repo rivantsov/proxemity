@@ -16,7 +16,7 @@ namespace Proxemity {
     /// <summary>Creates a dynamic assembly, returns an object containing information about it. The returned 
     /// object can be used to emit multiple proxy classes using ProxyEmitter.</summary>
     /// <param name="assemblyName">Full assembly name.</param>
-    /// <returns>Assembly info object, a descriptor to use as parameter for other emitter methods.</returns>
+    /// <returns>Assembly info object.</returns>
     public static DynamicAssemblyInfo Create(string assemblyName) {
       var asmName = new AssemblyName(assemblyName);
       asmName.Version = new Version(1, 0, 0, 0);

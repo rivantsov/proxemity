@@ -13,15 +13,14 @@ namespace Proxemity.UnitTests {
    property get/set calls to the underlying EntityRecord's GetValue and SetValue methods.
    */
 
-  /* the proxy emitter will generate a class implementing IMyEntity, inherited from Entity. The class will redirect 
-     all calls to properties to Record.SetValue and Record.GetValue, with Record being a reference to IEntityRecord/EntityRecordMock
-     instance. 
-   */
+  // In this test, the proxy emitter will generate a class implementing IMyEntity, inherited from EntityBase. The class will redirect 
+  //   all calls to properties to Record.SetValue and Record.GetValue. 
 
   // We test that when interface is inherited from another, it works - the emitter finds all inherited methods
   public interface IBaseEntity {
     int Id { get; set; }
   }
+
   [Description("Entity description.")] //should be copied to emitted class
   [Category("Cat1")]
   public interface IMyEntity : IBaseEntity {
@@ -64,7 +63,7 @@ namespace Proxemity.UnitTests {
     }
   }
 
-
+  // The emit controller to use for emitting proxy
   public class EntityEmitController :ProxyEmitControllerBase {
     FieldInfo _targetRef = typeof(EntityBase).GetField("Record");
     MethodInfo _recordGetValue = typeof(EntityRecord).GetMethod("GetValue");
@@ -75,19 +74,19 @@ namespace Proxemity.UnitTests {
                 new SampleAttributeHandler()) {
     }
 
-    public override MemberEmitInfo GetMethodEmitInfo(MethodInfo interfaceMethod, PropertyInfo ownerProperty) {
+    public override MethodEmitInfo GetMethodEmitInfo(MethodInfo interfaceMethod, PropertyInfo ownerProperty) {
       // it is method, not property
       var propName = ownerProperty.Name; 
       bool isGet = interfaceMethod.Name.StartsWith("get_");
       if (isGet) {
         var args = new object[] { propName };
-        return new MemberEmitInfo(interfaceMethod, _targetRef, _recordGetValue, args);
+        return new MethodEmitInfo(interfaceMethod, _targetRef, _recordGetValue, args);
       } else {
         var valuePrm = interfaceMethod.GetParameters()[0];
         var args = new object[] { propName, valuePrm };
-        return new MemberEmitInfo(interfaceMethod, _targetRef, _recordSetValue, args); 
+        return new MethodEmitInfo(interfaceMethod, _targetRef, _recordSetValue, args); 
       }
     }//method
   }//class
 
-}
+} //ns
