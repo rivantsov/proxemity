@@ -74,9 +74,8 @@ namespace Proxemity.UnitTests {
                 new SampleAttributeHandler()) {
     }
 
-    public override MethodEmitInfo GetMethodEmitInfo(MethodInfo interfaceMethod, PropertyInfo ownerProperty) {
-      // it is method, not property
-      var propName = ownerProperty.Name; 
+    public override MethodEmitInfo GetMethodEmitInfo(MethodInfo interfaceMethod, PropertyInfo parentProperty) {
+      var propName = parentProperty.Name; 
       bool isGet = interfaceMethod.Name.StartsWith("get_");
       if (isGet) {
         var args = new object[] { propName };

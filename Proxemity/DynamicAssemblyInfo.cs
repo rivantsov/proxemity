@@ -7,7 +7,7 @@ using System.Text;
 namespace Proxemity {
   /// <summary>A container for dynamic assembly builder. Use <see cref="Create(string)"/>  method to create an instance.</summary>
   /// <remarks>You can create an assembly once and then use it to build multiple proxy classes.</remarks>
-  public class DynamicAssemblyInfo {
+  public class DynamicAssemblyInfo : IDisposable {
     /// <summary>Assembly builder.</summary>
     public readonly AssemblyBuilder AssemblyBuilder;
     /// <summary>Module builder.</summary>
@@ -23,6 +23,10 @@ namespace Proxemity {
       var asmBuilder = AssemblyBuilder.DefineDynamicAssembly(asmName, AssemblyBuilderAccess.Run);
       var moduleBuilder = asmBuilder.DefineDynamicModule("Main");
       return new DynamicAssemblyInfo(asmBuilder, moduleBuilder);
+    }
+
+    void IDisposable.Dispose() {
+      // looks like nothing to dipose
     }
 
     private DynamicAssemblyInfo(AssemblyBuilder assemblyBuilder, ModuleBuilder moduleBuilder) {

@@ -7,7 +7,7 @@ namespace Proxemity {
 
   /// <summary>Controls the process of emitting the proxy class. Client code should implement sub-class with custom logic
   /// for guiding the emitter. </summary>
-  /// <remarks>The only requied method to implement is <see cref="GetMethodEmitInfo(MethodInfo, PropertyInfo)"/>.</remarks>
+  /// <remarks>The only required method to implement is <see cref="GetMethodEmitInfo(MethodInfo, PropertyInfo)"/>.</remarks>
   public abstract class ProxyEmitControllerBase {
     /// <summary>Dynamic assembly information.</summary>
     public readonly DynamicAssemblyInfo Assembly;

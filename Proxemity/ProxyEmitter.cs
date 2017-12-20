@@ -199,8 +199,8 @@ namespace Proxemity {
       if (_controller.AttributeHandler != null) {
         var allAttrs = iMethod.GetCustomAttributes(inherit: true).OfType<Attribute>().ToList();
         var attrBuilders = CreateAttributeBuilders(allAttrs);
-        foreach(var clone in attrBuilders)
-          mb.SetCustomAttribute(clone);
+        foreach(var ab in attrBuilders)
+          mb.SetCustomAttribute(ab);
       }
 
       _controller.OnMethodEmitted(iMethod, mb);
