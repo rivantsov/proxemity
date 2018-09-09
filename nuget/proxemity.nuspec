@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package > 
+  <metadata>
+    <id>Proxemity</id>
+    <version>$version$</version>
+    <authors>Roman Ivantsov</authors>
+    <owners>Roman Ivantsov</owners>
+    <projectUrl>https://github.com/rivantsov/proxemity</projectUrl>
+    <licenseUrl>https://github.com/rivantsov/proxemity/blob/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Proxy IL Emitter</description>
+    <releaseNotes></releaseNotes>
+    <copyright>Copyright Roman Ivantsov 2018</copyright>
+    <tags>Proxy Emit IL .NET</tags>
+    <dependencies>
+    </dependencies>
+  </metadata>
+  <files>
+	 <file src="..\Proxemity\bin\Release\netstandard2.0\Proxemity.dll" target="lib\netstandard2.0" />
+	 <file src="..\Proxemity\bin\Release\netstandard2.0\Proxemity.pdb" target="lib\netstandard2.0" />
+	 <file src="..\Proxemity\bin\Release\netstandard2.0\Proxemity.xml" target="lib\netstandard2.0" />
+	 <file src="..\..\Proxemity\**\*.cs" target="src\Proxemity" />
+  </files>
+</package>

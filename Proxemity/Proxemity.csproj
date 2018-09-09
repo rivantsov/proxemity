@@ -2,23 +2,26 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Authors>Roman Ivantsov</Authors>
-    <Company>Roman Ivantsov</Company>
-    <Description>.NET dynamic proxy emitter</Description>
-    <Copyright>Roman Ivantsov, 2017</Copyright>
-    <PackageProjectUrl>https://github.com/rivantsov/proxemity</PackageProjectUrl>
+    <RootNamespace>Proxemity</RootNamespace>
+    <AssemblyName>Proxemity</AssemblyName>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <RepositoryUrl>https://github.com/rivantsov/proxemity</RepositoryUrl>
-    <RepositoryType>Git</RepositoryType>
-    <PackageTags>.NET IL-Emit Proxy</PackageTags>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/rivantsov/proxemity</PackageProjectUrl>
     <PackageLicenseUrl>https://github.com/rivantsov/proxemity/blob/master/LICENSE</PackageLicenseUrl>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>ProxemityKey.snk</AssemblyOriginatorKeyFile>
-    <NeutralLanguage>en-US</NeutralLanguage>
+    <DelaySign>false</DelaySign>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DocumentationFile>bin\Debug\netstandard2.0\Proxemity.xml</DocumentationFile>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DocumentationFile>bin\Release\netstandard2.0\Proxemity.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
