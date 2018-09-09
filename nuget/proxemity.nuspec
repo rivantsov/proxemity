@@ -19,6 +19,6 @@
 	 <file src="..\Proxemity\bin\Release\netstandard2.0\Proxemity.dll" target="lib\netstandard2.0" />
 	 <file src="..\Proxemity\bin\Release\netstandard2.0\Proxemity.pdb" target="lib\netstandard2.0" />
 	 <file src="..\Proxemity\bin\Release\netstandard2.0\Proxemity.xml" target="lib\netstandard2.0" />
-	 <file src="..\..\Proxemity\**\*.cs" target="src\Proxemity" />
+	 <file src="..\Proxemity\**\*.cs" target="src\Proxemity" />
   </files>
 </package>
